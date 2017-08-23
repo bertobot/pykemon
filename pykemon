@@ -24,15 +24,18 @@ Monster is the base class of a "monster"
 """
 class Monster(object):
     def __init__(self, **kwargs):
-        self.name = getattr(kwargs, 'name')
-        self.max_health = getattr(kwargs, 'max_health')
+        self.name = kwargs.get('name')
+        self.max_health = kwargs.get('max_health')
         self.health = self.max_health
-        self.exp = getattr(kwargs, 'exp')
-        self.attack = getattr(kwargs, 'attack')
-        self.defense = getattr(kwargs, 'defense')
-        self.speed = getattr(kwargs, 'speed')
-        self.luck = getattr(kwargs, 'luck')
-        self.level = getattr(kwargs, 'level')
+        self.exp = kwargs.get('exp')
+        self.attack = kwargs.get('attack')
+        self.defense = kwargs.get('defense')
+        self.speed = kwargs.get('speed')
+        self.luck = kwargs.get('luck')
+        self.level = kwargs.get('level')
+
+    def alive(self):
+        return self.health > 0
 
 """
 MonsterGenerator is a factory-type pattern object that generates monsters with
@@ -76,34 +79,81 @@ class Referee(object):
 
         return False
 
-    def run(self, m1, m2):
-        while True:
-            if self.attack(m1, m2):
-                print "{} wins the match!".format(m1.name)
-                break
+    def vsPlayer(self, player, monster): 
+        
+        for m1 in player.monsters:
+            if not m1.alive(): continue
 
-            elif self.attack(m2, m1):
-                print "{} wins the match!".format(m2.name)
-                break
-            
+            print "{} joins the battle!".format(m1.name)
+
+            while True:
+                if self.attack(m1, monster):
+                    print "{} wins the match!".format(m1.name)
+                    # TODO: option to capture monster here
+                    break
+
+                elif self.attack(monster, m1):
+                    print "{} wins the match!".format(monster.name)
+                    break
+
     
 class Area(object):
     def __init__(self, **kwargs):
-        self.names = kwargs.get('name', 'The Random Zone')
-        self.level_range = kwarags.get('level_range', range(1,100))
+        self.name = kwargs.get('name', 'The Random Zone')
+        self.level_min = kwargs.get('level_min')
+        self.level_max = kwargs.get('level_max')
+        self.dice = kwargs.get('dice', Dice())
+        self.back = kwargs.get('back')
+        self.neighbors = kwargs.get('neighbors', [])
+
+    def addNeighbors(self, neighbors):
+        for n in neighbors:
+            self.neighbors.append(n)
+
+    def battle(self):
+        # generate monster
+        m = MGENERATOR.generate("{} monster".format(self.name), (random.random() % self.level_max) + self.level_min, Dice())
+        
+        REF.vsPlayer(PLAYER, m)
+
+        self.enter()
+
+    def enter(self):
+        # random encounter
+
+        # TODO: implement random encounter
+#        # (player.level - area.max_level) / max dice = chance of encounter
+#        enc_chance = (self.level_max - player.getMaxLevel() ) / self.dice.getSize();
+#        if enc_chance < 0: enc_chance = 0
+#        if (self.dice.percent() >= 
+
+        options = []
+
+        options.append(Option(label="Battle!", key='b', callback=self.battle))
+
+        for n in self.neighbors:
+            options.append(Option(label="Travel to {}".format(n.name), key=n.name[0].lower(), callback=n.enter))
+
+        options.append(Option(label="Back", key='t', callback=self.back))
+        
+        p = Prompt(label="You have entered {}".format(self.name), options=options)
+
+        p.prompt()
 
 class Player(object):
     def __init__(self, **kwargs):
         self.name = kwargs.get('name', 'Ashthorp')
-        self.monsters = []
+        self.monsters = [ MGENERATOR.generate(name='Pykachu', level=1, dice=Dice() ) ]
         self.area = None
 
-    def enterArea(self, area):
-        self.area = area
+    def getMaxLevel(self):
+        max = 0
 
+        for m in self.monsters:
+            if m.level > max:
+                max = m.level
 
-
-
+        return max
 
 
 class Option(object):
@@ -127,7 +177,7 @@ class Prompt(object):
         for opt in self.options:
             msg += "{}\n".format(opt)
 
-        msg += "choice: "
+        msg += "\nchoice: "
 
         return msg
 
@@ -146,20 +196,36 @@ class Prompt(object):
             if not correct:
                 print "invalid option '{}'.  Try again.\n".format(key)
 
+
+# callbacks
+# 
+# This section is used for linking together the prompts/menus, options and to what functions
+# should be triggered.  This is where we tie the system together.
+#
+
 # new game callback
 def callback_newgame():
-    callback_quitgame()
+    options = []
+
+    for area in AREAS:
+        options.append(Option(label="{}".format(area.name), key=area.name[0].lower(), callback=area.enter))
+
+    options.append(Option(label='Back', key='t', callback=callback_title))
+
+    p = Prompt(label='Choose a starting area:', options=options)
+
+    p.prompt()
+        
 
 # quit game callback
 def callback_quitgame():
+    # TODO: save?
+    
+    print "Goodbye."
+
     sys.exit(0)
     
-
-def main():
-
-    
-    # options
-
+def callback_title():
     # main menu options
     opts_main_menu = [
             Option(label="New Game", key='n', callback=callback_newgame),
@@ -168,11 +234,38 @@ def main():
 
     mainMenu = Prompt(label="Main Menu", options=opts_main_menu)
 
-    ref = Referee(Dice())
-
-    # start
     mainMenu.prompt()
+
+def area_generator():
+    # create 3 areas
+
+    # TODO: consider making area generation into a config file.
+    # in the mean time, continue forward as this is a proof-of-concept
+
+    areas = [
+        Area(name='Green Hills', level_min=1, level_max=5, back=callback_title),
+        Area(name='Aerie Peak', level_min=6, level_max=10, back=callback_title),
+        Area(name='Death Canyon', level_min=11, level_max=15, back=callback_title)
+    ]
+
+    areas[0].addNeighbors([ areas[1], areas[2] ])
+    areas[1].addNeighbors([ areas[0], areas[2] ])
+    areas[2].addNeighbors([ areas[0], areas[1] ])
+
+    return areas
+
+def main():
+    # start
+    callback_title()
+
+
+# constants assignments
+AREAS = area_generator()
+MGENERATOR = MonsterGenerator()
+REF = Referee(Dice() )
+PLAYER = Player()
 
 if __name__ == "__main__":
     main()
     
+
