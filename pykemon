@@ -129,7 +129,7 @@ class Area(object):
 
         options = []
 
-        options.append(Option(label="Battle!", key='b', callback=self.battle))
+        options.append(Option(label="Encounter!", key='e', callback=self.battle))
 
         for n in self.neighbors:
             options.append(Option(label="Travel to {}".format(n.name), key=n.name[0].lower(), callback=n.enter))
@@ -143,7 +143,7 @@ class Area(object):
 class Player(object):
     def __init__(self, **kwargs):
         self.name = kwargs.get('name', 'Ashthorp')
-        self.monsters = [ MGENERATOR.generate(name='Pykachu', level=1, dice=Dice() ) ]
+        self.monsters = [ MGENERATOR.generate(name='Pykachu', level=3, dice=Dice() ) ]
         self.area = None
 
     def getMaxLevel(self):
@@ -232,7 +232,7 @@ def callback_title():
             Option(label="Quit", key='q', callback=callback_quitgame)
     ]
 
-    mainMenu = Prompt(label="Main Menu", options=opts_main_menu)
+    mainMenu = Prompt(label="PyKEMON!", options=opts_main_menu)
 
     mainMenu.prompt()
 
@@ -243,14 +243,16 @@ def area_generator():
     # in the mean time, continue forward as this is a proof-of-concept
 
     areas = [
+        Area(name='Backyard', level_min=1, level_max=1, back=callback_title),
         Area(name='Green Hills', level_min=1, level_max=5, back=callback_title),
         Area(name='Aerie Peak', level_min=6, level_max=10, back=callback_title),
         Area(name='Death Canyon', level_min=11, level_max=15, back=callback_title)
     ]
 
-    areas[0].addNeighbors([ areas[1], areas[2] ])
-    areas[1].addNeighbors([ areas[0], areas[2] ])
-    areas[2].addNeighbors([ areas[0], areas[1] ])
+    areas[0].addNeighbors([ areas[1], areas[2], areas[3] ])
+    areas[1].addNeighbors([ areas[0], areas[2], areas[3] ])
+    areas[2].addNeighbors([ areas[0], areas[1], areas[3] ])
+    areas[3].addNeighbors([ areas[0], areas[1], areas[2] ])
 
     return areas
 
